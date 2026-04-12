@@ -34,5 +34,10 @@ namespace OpenWebUiUploader
         /// the file will be re-uploaded.
         /// </summary>
         public required string Hash { get; init; }
+
+        /// <summary>
+        /// The file ID on the Open WebUI server.
+        /// </summary>
+        public required string ServerId { get; set; }
     }
 }

@@ -39,6 +39,7 @@ namespace OpenWebUiUploader
         private readonly Option<FileInfo> databasePath;
         private readonly Option<DirectoryInfo> conversionDirectoryOption;
         private readonly Option<bool> deleteConvertedFilesOption;
+        private readonly Option<string> apiKeyEnvVarNameOption;
         private readonly Option<bool> dryRunOption;
         private readonly Option<bool> printLicenseOption;
         private readonly Option<bool> printReadmeOption;
@@ -82,9 +83,9 @@ namespace OpenWebUiUploader
             };
             this.rootCommand.Add( this.filePathOption );
 
-            this.knowledgeOption = new Option<string>( "--knowledge" )
+            this.knowledgeOption = new Option<string>( "--knowledge_id" )
             {
-                Description = "The knowledge to upload to Open WebUI.",
+                Description = "The knowledge ID (usually a UUID) to upload to Open WebUI.",
                 Required = true
             };
             this.rootCommand.Add( this.knowledgeOption );
@@ -110,6 +111,14 @@ namespace OpenWebUiUploader
                 Required = false
             };
             this.rootCommand.Add( this.deleteConvertedFilesOption );
+
+            this.apiKeyEnvVarNameOption = new Option<string>( "--api_env_var_name" )
+            {
+                DefaultValueFactory = ( ArgumentResult argResult ) => UploaderConfig.DefaultApiKeyEnvVarName,
+                Description = "The name of the environment variable that contains the API key; NOT the API key itself.",
+                Required = false
+            };
+            this.rootCommand.Add( this.apiKeyEnvVarNameOption );
 
             this.dryRunOption = new Option<bool>( "--dry_run" )
             {
@@ -186,6 +195,7 @@ namespace OpenWebUiUploader
                     result.GetValue( this.databasePath ),
                     result.GetValue( this.conversionDirectoryOption ),
                     result.GetValue( this.deleteConvertedFilesOption ),
+                    result.GetValue( this.apiKeyEnvVarNameOption ),
                     result.GetValue( this.dryRunOption )
                 );
 

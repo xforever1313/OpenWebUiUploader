@@ -17,8 +17,10 @@
 //
 
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.Extensions.FileSystemGlobbing;
+using OpenWebUiUploader.Models;
 using Serilog;
 
 namespace OpenWebUiUploader
@@ -34,6 +36,7 @@ namespace OpenWebUiUploader
         private readonly DirectoryInfo conversionDirectory;
         private readonly bool deleteConvertedFiles;
         private readonly bool dryRun;
+        private readonly string apiKey;
 
         private readonly ILogger log;
 
@@ -55,6 +58,7 @@ namespace OpenWebUiUploader
             this.conversionDirectory = config.ConversionDirectory;
             this.deleteConvertedFiles = config.DeleteConvertedFiles;
             this.dryRun = config.DryRun;
+            this.apiKey = config.GetApiKey();
 
             this.log = log;
             this.httpClient = new HttpClient
@@ -67,6 +71,7 @@ namespace OpenWebUiUploader
                     this.GetType().Assembly.GetName()?.Version?.ToString() ?? "0.0.0"
                 )
             );
+            this.httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue( "Bearer", this.apiKey );
         }
 
         public void Dispose()
@@ -140,9 +145,12 @@ namespace OpenWebUiUploader
             FileInfo? dbPath = GetDatabaseFilePath();
 
             using var database = new Database( dbPath );
+            this.DetectRemovedFiles( database, databaseDirectory );
+
+            this.log.Information( "Uploading new or changed files." );
             foreach( string file in files )
             {
-                this.log.Information( $"Processing: {file}" );
+                this.log.Debug( $"Processing: {file}" );
                 string relativePath = Path.GetRelativePath( databaseDirectory.FullName, file );
                 this.log.Verbose( $"File path key: {relativePath}" );
 
@@ -171,6 +179,7 @@ namespace OpenWebUiUploader
                             this.log.Verbose( "File on disk's hash does not match hash in database.  Must re-upload." );
                             if( this.dryRun == false )
                             {
+                                this.Remove( database, file, relativePath, databaseFileHash.ServerId );
                                 this.Upload( database, file, relativePath, diskFileHash );
                             }
                         }
@@ -183,10 +192,13 @@ namespace OpenWebUiUploader
                         }
                         else
                         {
-                            this.log.Verbose( "File does not exists on disk but is in the database.  Removing." );
+                            this.log.Verbose( "File does not exists on disk but is in the database.  Removing from database, but staying on server." );
                             if( this.dryRun == false )
                             {
-                                this.Remove( database, file, relativePath );
+                                if( database.Files.Delete( relativePath ) == false )
+                                {
+                                    this.log.Error( $"Failed to remove file not on disk from database for: {file}" );
+                                }
                             }
                         }
                     }
@@ -262,9 +274,34 @@ namespace OpenWebUiUploader
             this.log.Debug( $"Dry Run: {this.dryRun}" );
         }
 
+        private void DetectRemovedFiles( Database database, DirectoryInfo dbDirectory )
+        {
+            this.log.Information( "Removing files from OpenWebUI that are no longer on disk." );
+            foreach( FileHash fileHash in database.Files.FindAll() )
+            {
+                var filePath = new FileInfo( Path.Combine( dbDirectory.FullName, fileHash.FilePath ) );
+                if( filePath.Exists == false )
+                {
+                    this.log.Debug( $"File exists in database, but no longer on disk.  Removing: {filePath}" );
+                    this.Remove( database, filePath.FullName, fileHash.FilePath, fileHash.ServerId );
+                }
+            }
+        }
+
         private void Upload( Database database, string filePath, string relativePath, string diskFileHash )
         {
-            var hash = new FileHash { FilePath = relativePath, Hash = diskFileHash };
+            string fileId = this.UploadFile( filePath );
+            var hash = new FileHash
+            {
+                FilePath = relativePath,
+                Hash = diskFileHash,
+                ServerId = fileId
+            };
+
+            this.log.Debug( $"'{filePath}' uploaded, awaiting processing." );
+
+            this.WaitForProcessing( filePath, fileId );
+            this.AddToKnowledge( fileId );
 
             if( database.Files.Update( hash ) == false )
             {
@@ -272,8 +309,115 @@ namespace OpenWebUiUploader
             }
         }
 
-        private void Remove( Database database, string filePath, string relativePath )
+        private string UploadFile( string filePath )
         {
+            using var request = new HttpRequestMessage( HttpMethod.Post, "/api/v1/files/" );
+            request.Headers.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/json" ) );
+
+            HttpResponseMessage fileUploadResponse = this.httpClient.Send( request );
+            if( fileUploadResponse.IsSuccessStatusCode == false )
+            {
+                string errorResponse = fileUploadResponse.Content.ReadAsStringAsync().Result;
+                throw new HttpException(
+                    $"Failed to upload file.{Environment.NewLine}{fileUploadResponse.StatusCode} - {errorResponse}"
+                );
+            }
+
+            AddFileResponse? response = fileUploadResponse.Content.ReadFromJsonAsync<AddFileResponse>().Result;
+            if( response is null )
+            {
+                throw new HttpException( $"Could not convert upload file response to {nameof( AddFileResponse )}." );
+            }
+            else if( string.IsNullOrWhiteSpace( response.FileId ) )
+            {
+                throw new HttpException( $"Could not get file ID after uploading: {filePath}." );
+            }
+            else
+            {
+                return response.FileId;
+            }
+        }
+
+        private void WaitForProcessing( string filePath, string fileId )
+        {
+            bool success = false;
+            while( success == false )
+            {
+                using var request = new HttpRequestMessage( HttpMethod.Post, $"/api/v1/files/{fileId}/process/status" );
+
+                HttpResponseMessage fileProcessStatusResponse = this.httpClient.Send( request );
+                if( fileProcessStatusResponse.IsSuccessStatusCode == false )
+                {
+                    string errorResponse = fileProcessStatusResponse.Content.ReadAsStringAsync().Result;
+                    throw new HttpException(
+                        $"Failed to check status of file.{Environment.NewLine}{fileProcessStatusResponse.StatusCode} - {errorResponse}"
+                    );
+                }
+
+                FileProcessingStatusResponse? response = fileProcessStatusResponse.Content.ReadFromJsonAsync<FileProcessingStatusResponse>().Result;
+                if( response is null )
+                {
+                    throw new HttpException( $"Could not convert upload file response to {nameof( FileProcessingStatusResponse )}." );
+                }
+                else if( string.IsNullOrWhiteSpace( response.Status ) )
+                {
+                    throw new HttpException( $"Could not get status of file processing after uploading: {filePath}." );
+                }
+                else if( response.Status.Equals( "failed", StringComparison.OrdinalIgnoreCase ) )
+                {
+                    throw new HttpException( $"Failed to process uploaded file: {response.Error}" );
+                }
+                else if( response.Status.Equals( "completed", StringComparison.OrdinalIgnoreCase ) )
+                {
+                    this.log.Debug( $"File '{filePath}' done processing." );
+                    success = true;
+                }
+
+                if( success == false )
+                {
+                    this.log.Verbose( $"File '{filePath}' not done processing yet.  Checking in a few seconds." );
+                    Thread.Sleep( new TimeSpan( 0, 0, 0, 5 ) );
+                }
+            }
+        }
+
+        private void AddToKnowledge( string fileId )
+        {
+            using var request = new HttpRequestMessage( HttpMethod.Post, $"/api/v1/knowledge/{this.knowledge}/file/add" );
+            
+            var requestContent = new AddFileToKnowledgeRequest { FileId = fileId };
+
+            using var content = JsonContent.Create( requestContent );
+            request.Content = content;
+
+            HttpResponseMessage fileProcessStatusResponse = this.httpClient.Send( request );
+            if( fileProcessStatusResponse.IsSuccessStatusCode == false )
+            {
+                string errorResponse = fileProcessStatusResponse.Content.ReadAsStringAsync().Result;
+                throw new HttpException(
+                    $"Failed to add file to knowledge.{Environment.NewLine}{fileProcessStatusResponse.StatusCode} - {errorResponse}"
+                );
+            }
+        }
+
+        private void Remove( Database database, string filePath, string relativePath, string fileId )
+        {
+            using var request = new HttpRequestMessage( HttpMethod.Post, $"/api/v1/knowledge/{this.knowledge}/file/remove" );
+
+            var requestContent = new AddFileToKnowledgeRequest { FileId = fileId };
+
+            using var content = JsonContent.Create( requestContent );
+            request.Content = content;
+
+            HttpResponseMessage fileProcessStatusResponse = this.httpClient.Send( request );
+            if( fileProcessStatusResponse.IsSuccessStatusCode == false )
+            {
+                string errorResponse = fileProcessStatusResponse.Content.ReadAsStringAsync().Result;
+                throw new HttpException(
+                    $"Failed to add file to knowledge.{Environment.NewLine}{fileProcessStatusResponse.StatusCode} - {errorResponse}"
+                );
+            }
+
             if( database.Files.Delete( relativePath ) == false )
             {
                 this.log.Error( $"Failed to remove file not on disk from database for: {filePath}" );

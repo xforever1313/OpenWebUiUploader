@@ -52,9 +52,14 @@ namespace OpenWebUiUploader
         FileInfo? DatabasePath,
         DirectoryInfo? ConversionDirectory,
         bool DeleteConvertedFiles,
+        string? ApiKeyEnvVarName,
         bool DryRun
     )
     {
+        // ---------------- Fields ----------------
+
+        internal const string DefaultApiKeyEnvVarName = "OPEN_WEBUI_API_KEY";
+
         // ---------------- Methods ----------------
 
         [MemberNotNullWhen(
@@ -110,6 +115,18 @@ namespace OpenWebUiUploader
                 errorMessage = null;
                 return true;
             }
+        }
+
+        public string GetApiKey()
+        {
+            string envVarName = this.ApiKeyEnvVarName ?? DefaultApiKeyEnvVarName;
+            string? key = Environment.GetEnvironmentVariable( envVarName );
+            if( string.IsNullOrWhiteSpace( key ) )
+            {
+                throw new MissingRequiredArgumentException( $"API Key not specifid in environment variable: {envVarName} " );
+            }
+
+            return key;
         }
     }
 }

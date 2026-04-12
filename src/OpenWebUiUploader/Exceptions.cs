@@ -47,4 +47,14 @@ namespace OpenWebUiUploader
         {
         }
     }
+
+    public sealed class HttpException : Exception
+    {
+        // ---------------- Lifetime ----------------
+
+        public HttpException( string message ) :
+            base( message )
+        {
+        }
+    }
 }
