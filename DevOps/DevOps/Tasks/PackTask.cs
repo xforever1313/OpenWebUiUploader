@@ -1,4 +1,4 @@
-﻿//
+//
 // OpenWebUiUploader - A way to upload files as knowledges to Open WebUI.
 // Copyright (C) 2026 Seth Hendrick
 // 
@@ -16,29 +16,22 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-using System.Reflection;
+using Cake.Common.Tools.DotNet;
+using Cake.Common.Tools.DotNet.Pack;
 using Cake.Frosting;
 
-namespace DevOps;
+namespace DevOps.Tasks;
 
-internal class Program
+[TaskName( "nuget_pack" )]
+public sealed class PackTask : DevopsTask
 {
-    private static int Main( string[] args )
+    public override void Run( BuildContext context )
     {
-        string exeDir = Path.GetDirectoryName( Assembly.GetExecutingAssembly().Location ) ?? string.Empty;
-        string repoRoot = Path.Combine(
-            exeDir, // app
-            "..", // Debug
-            "..", // Bin
-            "..", // DevOps (project)
-            "..", // DevOps (sln)
-            ".." // Src
-        );
+        var settings = new DotNetPackSettings
+        {
+            Configuration = "Release",
+        };
 
-        return new CakeHost()
-            .UseContext<BuildContext>()
-            .SetToolPath( ".cake" )
-            .UseWorkingDirectory( repoRoot )
-            .Run( args );
+        context.DotNetPack( context.ProjectPath.ToString(), settings );
     }
 }

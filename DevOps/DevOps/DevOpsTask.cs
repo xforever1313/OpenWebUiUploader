@@ -1,4 +1,4 @@
-﻿//
+//
 // OpenWebUiUploader - A way to upload files as knowledges to Open WebUI.
 // Copyright (C) 2026 Seth Hendrick
 // 
@@ -16,29 +16,24 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-using System.Reflection;
+using System.Runtime.ExceptionServices;
+using Cake.Common.Diagnostics;
 using Cake.Frosting;
 
 namespace DevOps;
 
-internal class Program
+public abstract class DevopsTask : FrostingTask<BuildContext>
 {
-    private static int Main( string[] args )
-    {
-        string exeDir = Path.GetDirectoryName( Assembly.GetExecutingAssembly().Location ) ?? string.Empty;
-        string repoRoot = Path.Combine(
-            exeDir, // app
-            "..", // Debug
-            "..", // Bin
-            "..", // DevOps (project)
-            "..", // DevOps (sln)
-            ".." // Src
-        );
+    // ---------------- Functions ----------------
 
-        return new CakeHost()
-            .UseContext<BuildContext>()
-            .SetToolPath( ".cake" )
-            .UseWorkingDirectory( repoRoot )
-            .Run( args );
+    public override void OnError( Exception exception, BuildContext context )
+    {
+        // We want the stack trace to print out when all is said and done.
+        // The way to do this is to set the verbosity to the maximum,
+        // and then re-throw the exception.  Use the weird DispatchInfo
+        // class so we don't get a new stack trace.
+        // We need to re-throw the exception, or cake will exit with a zero exit code.
+        context.DiagnosticVerbosity();
+        ExceptionDispatchInfo.Capture( exception ).Throw();
     }
 }
