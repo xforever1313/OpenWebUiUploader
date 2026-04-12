@@ -19,6 +19,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using ElBruno.MarkItDotNet;
 using Microsoft.Extensions.FileSystemGlobbing;
 using OpenWebUiUploader.Models;
 using Serilog;
@@ -148,6 +149,16 @@ namespace OpenWebUiUploader
             this.DetectRemovedFiles( database, databaseDirectory );
 
             this.log.Information( "Uploading new or changed files." );
+
+            if( this.conversionDirectory.Exists == false )
+            {
+                this.log.Verbose( "Conversion working directory not found.  Creating." );
+                if( dryRun == false )
+                {
+                    this.conversionDirectory.Create();
+                }
+            }
+
             foreach( string file in files )
             {
                 this.log.Debug( $"Processing: {file}" );
@@ -290,7 +301,9 @@ namespace OpenWebUiUploader
 
         private void Upload( Database database, string filePath, string relativePath, string diskFileHash )
         {
-            string fileId = this.UploadFile( filePath );
+            FileInfo markdownFile = this.ConvertFile( filePath );
+
+            string fileId = this.UploadFile( markdownFile.FullName );
             var hash = new FileHash
             {
                 FilePath = relativePath,
@@ -300,13 +313,47 @@ namespace OpenWebUiUploader
 
             this.log.Debug( $"'{filePath}' uploaded, awaiting processing." );
 
-            this.WaitForProcessing( filePath, fileId );
+            this.WaitForProcessing( markdownFile.FullName, fileId );
             this.AddToKnowledge( fileId );
 
             if( database.Files.Update( hash ) == false )
             {
                 this.log.Error( $"Failed to update file hash in the database for: {filePath}" );
             }
+        }
+
+        private FileInfo ConvertFile( string filePath )
+        {
+            bool uniqueFile = false;
+            int? index = null;
+            FileInfo? targetFile;
+            do
+            {
+                targetFile = new FileInfo(
+                    Path.Combine(
+                        this.conversionDirectory.FullName,
+                        Path.GetFileNameWithoutExtension( filePath ) + $"{index}.md"
+                    )
+                );
+
+                uniqueFile = ( targetFile.Exists == false );
+
+                if( uniqueFile == false )
+                {
+                    if( index is null )
+                    {
+                        index = 0;
+                    }
+                    ++index;
+                }
+            }
+            while( uniqueFile == false );
+
+            var converter = new MarkdownConverter();
+            string markdown = converter.ConvertToMarkdown( filePath );
+            File.WriteAllText( targetFile.FullName, markdown );
+
+            return targetFile;
         }
 
         private string UploadFile( string filePath )
