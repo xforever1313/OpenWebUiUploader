@@ -16,35 +16,23 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
+using System.ComponentModel.DataAnnotations;
+
 namespace OpenWebUiUploader
 {
-    public sealed class ArgumentParseException : Exception
+    public sealed record class FileHash
     {
-        // ---------------- Lifetime ----------------
+        /// <summary>
+        /// The path to the file that should be uploaded.
+        /// The path is relative to the directory the database lives in.
+        /// </summary>
+        [Key]
+        public required string FilePath { get; init; }
 
-        public ArgumentParseException( string message ) :
-            base( message )
-        {
-        }
-    }
-
-    public sealed class MissingRequiredArgumentException : Exception
-    {
-        // ---------------- Lifetime ----------------
-
-        public MissingRequiredArgumentException( string message ) :
-            base( message )
-        {
-        }
-    }
-
-    public sealed class DatabaseException : Exception
-    {
-        // ---------------- Lifetime ----------------
-
-        public DatabaseException( string message ) :
-            base( message )
-        {
-        }
+        /// <summary>
+        /// The sha256 hash of the file.  If the hash mismatches,
+        /// the file will be re-uploaded.
+        /// </summary>
+        public required string Hash { get; init; }
     }
 }

@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Text;
+using Serilog;
 
 namespace OpenWebUiUploader
 {
@@ -54,6 +55,22 @@ namespace OpenWebUiUploader
             this.serverUrlOption = new Option<Uri>( "--server_url" )
             {
                 Description = "The URL to the Open WebUI Instance.",
+                CustomParser = ( ArgumentResult result ) =>
+                {
+                    var token = result.Tokens.SingleOrDefault()?.Value;
+                    if( string.IsNullOrWhiteSpace( token ) )
+                    {
+                        return null;
+                    }
+
+                    if( Uri.TryCreate( token, UriKind.Absolute, out Uri? uri ) )
+                    {
+                        return uri;
+                    }
+
+                    result.AddError( $"Invalid URL: {token}" );
+                    return null;
+                },
                 Required = true
             };
             this.rootCommand.Add( this.serverUrlOption );
@@ -171,6 +188,14 @@ namespace OpenWebUiUploader
                     result.GetValue( this.deleteConvertedFilesOption ),
                     result.GetValue( this.dryRunOption )
                 );
+
+                using var logger = new LoggerConfiguration()
+                    .MinimumLevel.Verbose()
+                    .WriteTo.Console()
+                    .CreateLogger();
+
+                using var runner = new OpenWebUiRunner( config, logger );
+                runner.Run();
             }
         }
 

@@ -37,6 +37,16 @@ internal class Program
             Console.WriteLine( e.Message );
             return 2;
         }
+        catch( DirectoryNotFoundException e )
+        {
+            Console.WriteLine( e.Message );
+            return 3;
+        }
+        catch( FileNotFoundException e )
+        {
+            Console.WriteLine( e.Message );
+            return 4;
+        }
         catch( Exception e )
         {
             Console.WriteLine( "FATAL: Unhandled Exception:" );
