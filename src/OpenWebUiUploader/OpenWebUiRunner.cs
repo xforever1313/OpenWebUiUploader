@@ -183,7 +183,7 @@ namespace OpenWebUiUploader
                         }
                         else if( diskFileHash.Equals( databaseFileHash.Hash, StringComparison.OrdinalIgnoreCase ) )
                         {
-                            this.log.Verbose( "File on disk's hash matcheshash in database.  Do nothing." );
+                            this.log.Verbose( "File on disk's hash matches hash in database.  Do nothing." );
                         }
                         else
                         {
@@ -216,6 +216,7 @@ namespace OpenWebUiUploader
                 }
                 catch( Exception e )
                 {
+                    this.log.Error( $"{file} failed: {e.GetType()} - {e.Message}" );
                     exceptions.Add( e );
                 }
             }
@@ -303,7 +304,7 @@ namespace OpenWebUiUploader
         {
             FileInfo markdownFile = this.ConvertFile( filePath );
 
-            string fileId = this.UploadFile( markdownFile.FullName );
+            string fileId = this.UploadFile( markdownFile );
             var hash = new FileHash
             {
                 FilePath = relativePath,
@@ -314,9 +315,12 @@ namespace OpenWebUiUploader
             this.log.Debug( $"'{filePath}' uploaded, awaiting processing." );
 
             this.WaitForProcessing( markdownFile.FullName, fileId );
+
+            this.log.Debug( $"'{filePath}' processed, adding to knowledge." );
             this.AddToKnowledge( fileId );
 
-            if( database.Files.Update( hash ) == false )
+            this.log.Debug( $"'{filePath}'adding to knowledge. Updaing database." );
+            if( database.Files.Upsert( hash ) == false )
             {
                 this.log.Error( $"Failed to update file hash in the database for: {filePath}" );
             }
@@ -349,6 +353,7 @@ namespace OpenWebUiUploader
             }
             while( uniqueFile == false );
 
+            this.log.Debug( $"Converting '{filePath}' to '{targetFile.FullName}'." );
             var converter = new MarkdownConverter();
             string markdown = converter.ConvertToMarkdown( filePath );
             File.WriteAllText( targetFile.FullName, markdown );
@@ -356,10 +361,17 @@ namespace OpenWebUiUploader
             return targetFile;
         }
 
-        private string UploadFile( string filePath )
+        private string UploadFile( FileInfo filePath )
         {
             using var request = new HttpRequestMessage( HttpMethod.Post, "/api/v1/files/" );
             request.Headers.Accept.Add( new MediaTypeWithQualityHeaderValue( "application/json" ) );
+            using var formData = new MultipartFormDataContent();
+
+            using var fileStream = filePath.Open( FileMode.Open, FileAccess.Read );
+            using var fileStreamContent = new StreamContent( fileStream );
+            formData.Add( fileStreamContent, "file", filePath.FullName );
+
+            request.Content = formData;
 
             HttpResponseMessage fileUploadResponse = this.httpClient.Send( request );
             if( fileUploadResponse.IsSuccessStatusCode == false )
@@ -390,7 +402,7 @@ namespace OpenWebUiUploader
             bool success = false;
             while( success == false )
             {
-                using var request = new HttpRequestMessage( HttpMethod.Post, $"/api/v1/files/{fileId}/process/status" );
+                using var request = new HttpRequestMessage( HttpMethod.Get, $"/api/v1/files/{fileId}/process/status" );
 
                 HttpResponseMessage fileProcessStatusResponse = this.httpClient.Send( request );
                 if( fileProcessStatusResponse.IsSuccessStatusCode == false )
@@ -449,6 +461,20 @@ namespace OpenWebUiUploader
 
         private void Remove( Database database, string filePath, string relativePath, string fileId )
         {
+            this.log.Debug( $"Deleting {filePath} from knowledge." );
+            this.DeleteFromKnowledge( fileId );
+
+            this.log.Debug( $"Deleting {filePath} from server." );
+            this.DeleteFromServer( fileId );
+
+            if( database.Files.Delete( relativePath ) == false )
+            {
+                this.log.Error( $"Failed to remove file not on disk from database for: {filePath}" );
+            }
+        }
+
+        private void DeleteFromKnowledge( string fileId )
+        {
             using var request = new HttpRequestMessage( HttpMethod.Post, $"/api/v1/knowledge/{this.knowledge}/file/remove" );
 
             var requestContent = new AddFileToKnowledgeRequest { FileId = fileId };
@@ -464,10 +490,19 @@ namespace OpenWebUiUploader
                     $"Failed to add file to knowledge.{Environment.NewLine}{fileProcessStatusResponse.StatusCode} - {errorResponse}"
                 );
             }
+        }
 
-            if( database.Files.Delete( relativePath ) == false )
+        private void DeleteFromServer( string fileId )
+        {
+            using var request = new HttpRequestMessage( HttpMethod.Delete, $"/api/v1/files/{fileId}" );
+
+            HttpResponseMessage fileProcessStatusResponse = this.httpClient.Send( request );
+            if( fileProcessStatusResponse.IsSuccessStatusCode == false )
             {
-                this.log.Error( $"Failed to remove file not on disk from database for: {filePath}" );
+                string errorResponse = fileProcessStatusResponse.Content.ReadAsStringAsync().Result;
+                throw new HttpException(
+                    $"Failed to add file to knowledge.{Environment.NewLine}{fileProcessStatusResponse.StatusCode} - {errorResponse}"
+                );
             }
         }
     }

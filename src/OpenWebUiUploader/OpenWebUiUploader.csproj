@@ -44,8 +44,10 @@
   <ItemGroup>
     <PackageReference Include="System.CommandLine" Version="2.0.5" />
     <PackageReference Include="ElBruno.MarkItDotNet" Version="0.3.1" />
+    <PackageReference Include="ElBruno.MarkItDotNet.AI" Version="0.3.1" />
     <PackageReference Include="ElBruno.MarkItDotNet.Excel" Version="0.3.1" />
     <PackageReference Include="ElBruno.MarkItDotNet.PowerPoint" Version="0.3.1" />
+    <PackageReference Include="ElBruno.MarkItDotNet.Whisper" Version="0.3.1" />
     <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.5" />
     <PackageReference Include="LiteDB" Version="5.0.21" />
     <PackageReference Include="Serilog" Version="4.3.1" />

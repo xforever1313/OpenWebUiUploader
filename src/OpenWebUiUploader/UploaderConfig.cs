@@ -98,6 +98,10 @@ namespace OpenWebUiUploader
             {
                 errors.Add( $"{nameof( this.ConversionDirectory )} is not specified, but it must be." );
             }
+            else if( this.ConversionDirectory.Exists )
+            {
+                errors.Add( $"{nameof( this.ConversionDirectory )} exists!  Halting in case this directory is important." );
+            }
 
             if(
                 ( this.ServerUrl is null ) ||

@@ -16,7 +16,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-using System.ComponentModel.DataAnnotations;
+using LiteDB;
 
 namespace OpenWebUiUploader
 {
@@ -26,7 +26,7 @@ namespace OpenWebUiUploader
         /// The path to the file that should be uploaded.
         /// The path is relative to the directory the database lives in.
         /// </summary>
-        [Key]
+        [BsonId]
         public required string FilePath { get; init; }
 
         /// <summary>
