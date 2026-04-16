@@ -400,6 +400,7 @@ namespace OpenWebUiUploader
         private void WaitForProcessing( string filePath, string fileId )
         {
             bool success = false;
+            int attempts = 0;
             while( success == false )
             {
                 using var request = new HttpRequestMessage( HttpMethod.Get, $"/api/v1/files/{fileId}/process/status" );
@@ -408,8 +409,15 @@ namespace OpenWebUiUploader
                 if( fileProcessStatusResponse.IsSuccessStatusCode == false )
                 {
                     string errorResponse = fileProcessStatusResponse.Content.ReadAsStringAsync().Result;
-                    throw new HttpException(
-                        $"Failed to check status of file.{Environment.NewLine}{fileProcessStatusResponse.StatusCode} - {errorResponse}"
+                    ++attempts;
+
+                    if( attempts > 10 )
+                    {
+                        throw new HttpException("Failed to check status of file after 10 attempts.  Stopping retries." );
+                    }
+
+                    this.log.Warning(
+                        $"Failed to check status of file. Attempt {attempts}.{Environment.NewLine}{fileProcessStatusResponse.StatusCode} - {errorResponse}"
                     );
                 }
 
@@ -434,8 +442,10 @@ namespace OpenWebUiUploader
 
                 if( success == false )
                 {
-                    this.log.Verbose( $"File '{filePath}' not done processing yet.  Checking in a few seconds." );
-                    Thread.Sleep( new TimeSpan( 0, 0, 0, 5 ) );
+                    attempts = 0;
+                    const int secondsToWait = 30;
+                    this.log.Verbose( $"File '{filePath}' not done processing yet.  Checking in a {secondsToWait} seconds." );
+                    Thread.Sleep( new TimeSpan( 0, 0, 0, secondsToWait ) );
                 }
             }
         }
