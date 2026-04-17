@@ -314,6 +314,9 @@ namespace OpenWebUiUploader
 
             this.log.Debug( $"'{filePath}' uploaded, awaiting processing." );
 
+            // Wait a little bit before checking the status.
+            Thread.Sleep( new TimeSpan( 0, 0, 15 ) );
+
             this.WaitForProcessing( markdownFile.FullName, fileId );
 
             this.log.Debug( $"'{filePath}' processed, adding to knowledge." );
