@@ -77,7 +77,9 @@ namespace OpenWebUiUploader
 
             this.filePathOption = new Option<FileInfo>( "--file" )
             {
-                Description = "The file to upload to the knowledge in Open WebUI.  Globs are allowed to upload multiple files.  Directories are not allowed.",
+                Description = "The file(s) to upload to the knowledge in Open WebUI.  " +
+                              "Globs are allowed to upload multiple files.  " +
+                              "Directories are not allowed.",
                 Required = true
             };
             this.rootCommand.Add( this.filePathOption );

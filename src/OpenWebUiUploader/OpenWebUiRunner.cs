@@ -20,8 +20,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using DotNet.Globbing;
 using ElBruno.MarkItDotNet;
-using Microsoft.Extensions.FileSystemGlobbing;
 using OpenWebUiUploader.Models;
 using Serilog;
 
@@ -274,10 +274,19 @@ namespace OpenWebUiUploader
                 throw new DirectoryNotFoundException( $"Could not find directory that contains file: {directory.FullName}" );
             }
 
-            var globber = new Matcher();
-            globber.AddInclude( this.fileToUpload.Name );
+            var files = new List<string>();
 
-            return globber.GetResultsInFullPath( directory.FullName );
+            Glob glob = Glob.Parse( this.fileToUpload.FullName );
+
+            foreach( FileInfo file in directory.EnumerateFiles( "*", SearchOption.AllDirectories ) )
+            {
+                if( glob.IsMatch( file.FullName ) )
+                {
+                    files.Add( file.FullName );
+                }
+            }
+
+            return files;
         }
 
         private void PrintConfig()

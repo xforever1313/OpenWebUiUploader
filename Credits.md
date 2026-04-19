@@ -240,6 +240,11 @@ third-party archives.
 * **Url:** [https://github.com/dotnet/dotnet](https://github.com/dotnet/dotnet)
 * **License:** [MIT](https://github.com/dotnet/dotnet/blob/main/LICENSE.TXT)
 
+### Dotnet.Glob
+
+* **Url:** [https://github.com/dazinator/DotNet.Glob](https://github.com/dazinator/DotNet.Glob)
+* **License:** [MIT](https://github.com/dazinator/DotNet.Glob/blob/master/LICENSE)
+
 ### Dotnet Runtime
 
 * **Url:** [https://github.com/dotnet/runtime](https://github.com/dotnet/runtime)
