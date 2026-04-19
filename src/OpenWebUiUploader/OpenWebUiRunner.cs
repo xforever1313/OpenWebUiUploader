@@ -160,9 +160,13 @@ namespace OpenWebUiUploader
                 }
             }
 
+            int currentFile = 0;
+            int totalFiles = files.Count();
             foreach( string file in files )
             {
-                this.log.Debug( $"Processing: {file}" );
+                ++currentFile;
+
+                this.log.Debug( $"Processing file ({currentFile}/{totalFiles}): {file}" );
                 string relativePath = Path.GetRelativePath( databaseDirectory.FullName, file );
                 this.log.Verbose( $"File path key: {relativePath}" );
 
