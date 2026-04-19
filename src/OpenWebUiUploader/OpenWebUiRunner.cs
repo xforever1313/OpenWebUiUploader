@@ -16,6 +16,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
@@ -466,9 +467,21 @@ namespace OpenWebUiUploader
             if( fileProcessStatusResponse.IsSuccessStatusCode == false )
             {
                 string errorResponse = fileProcessStatusResponse.Content.ReadAsStringAsync().Result;
-                throw new HttpException(
-                    $"Failed to add file to knowledge.{Environment.NewLine}{fileProcessStatusResponse.StatusCode} - {errorResponse}"
-                );
+                if(
+                    ( fileProcessStatusResponse.StatusCode == HttpStatusCode.BadRequest ) &&
+                    "Duplicate content detected".Contains( errorResponse, StringComparison.OrdinalIgnoreCase )
+                )
+                {
+                    // If the content already exists, do nothing.  It probably got added but never got added
+                    // to the database.  Return success so it gets added to the database.
+                    this.log.Verbose( "Duplicate content detected.  Already in knowledge, adding to database." );
+                }
+                else
+                {
+                    throw new HttpException(
+                        $"Failed to add file to knowledge.{Environment.NewLine}{fileProcessStatusResponse.StatusCode} - {errorResponse}"
+                    );
+                }
             }
         }
 

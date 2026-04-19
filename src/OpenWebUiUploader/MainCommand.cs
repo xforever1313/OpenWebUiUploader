@@ -16,11 +16,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
-using System;
-using System.Collections.Generic;
 using System.CommandLine;
 using System.CommandLine.Parsing;
-using System.Text;
 using Serilog;
 using Serilog.Events;
 
