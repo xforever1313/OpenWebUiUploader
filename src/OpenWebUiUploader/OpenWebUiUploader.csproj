@@ -13,7 +13,7 @@
   <PropertyGroup>
     <PackageId>OpenWebUiUploader.Tool</PackageId>
     <Title>Open WebUI Uploader</Title>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Authors>Seth Hendrick</Authors>
     <Copyright>Copyright (C) Seth Hendrick</Copyright>
     <Description>Command line tool that helps upload files to a knowledge in an Open WebUI instance.</Description>
