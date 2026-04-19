@@ -22,6 +22,7 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Text;
 using Serilog;
+using Serilog.Events;
 
 namespace OpenWebUiUploader
 {
@@ -40,6 +41,7 @@ namespace OpenWebUiUploader
         private readonly Option<DirectoryInfo> conversionDirectoryOption;
         private readonly Option<bool> deleteConvertedFilesOption;
         private readonly Option<string> apiKeyEnvVarNameOption;
+        private readonly Option<LogEventLevel> verbosityOption;
         private readonly Option<bool> dryRunOption;
         private readonly Option<bool> printLicenseOption;
         private readonly Option<bool> printReadmeOption;
@@ -120,6 +122,14 @@ namespace OpenWebUiUploader
             };
             this.rootCommand.Add( this.apiKeyEnvVarNameOption );
 
+            this.verbosityOption = new Option<LogEventLevel>( "--verbosity" )
+            {
+                DefaultValueFactory = ( ArgumentResult argResult ) => LogEventLevel.Information,
+                Description = "The verbosity to set to when logging.",
+                Required = false
+            };
+            this.rootCommand.Add( this.verbosityOption );
+
             this.dryRunOption = new Option<bool>( "--dry_run" )
             {
                 DefaultValueFactory = ( ArgumentResult argResult ) => false,
@@ -199,8 +209,10 @@ namespace OpenWebUiUploader
                     result.GetValue( this.dryRunOption )
                 );
 
+                LogEventLevel logLevel = result.GetValue( this.verbosityOption );
+
                 using var logger = new LoggerConfiguration()
-                    .MinimumLevel.Verbose()
+                    .MinimumLevel.Is( logLevel )
                     .WriteTo.Console()
                     .CreateLogger();
 

@@ -22,6 +22,7 @@ Run ```openwebui_upload --help``` to see the options, but here's a brief overvie
 * ```--database_path``` - The path to the database on the local PC to store the file hashes.
 * ```--conversion_directory``` - The directory where converted markdown files are kept before being uploaded.  To keep the converted files, specify ```--delete_converted_files=true```.  If the directory exists before starting the program, it will not run so files inside the directory are not accidentally deleted.
 * ```--api_env_var_name``` - The name of the environment variable that contains your Open WebUI's API key.  The API key can not be passed in directly as a command line argument, as any user can see command line arguments; exposing your API key to anyone on the PC.
+* ```--verbosity``` - How detailed the log should be.  Defaults to ```Information```.
 
 ## Limitations
 
