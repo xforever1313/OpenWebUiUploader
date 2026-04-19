@@ -32,7 +32,7 @@ namespace OpenWebUiUploader
         // ---------------- Fields ----------------
 
         private readonly Uri serverUrl;
-        private readonly FileInfo fileToUpload;
+        private readonly FileInfo[] filesToUpload;
         private readonly string knowledge;
         private readonly FileInfo databasePath;
         private readonly DirectoryInfo conversionDirectory;
@@ -54,7 +54,7 @@ namespace OpenWebUiUploader
             }
 
             this.serverUrl = config.ServerUrl;
-            this.fileToUpload = config.FileToUpload;
+            this.filesToUpload = config.FileToUpload;
             this.knowledge = config.Knowledge;
             this.databasePath = config.DatabasePath;
             this.conversionDirectory = config.ConversionDirectory;
@@ -87,7 +87,13 @@ namespace OpenWebUiUploader
         {
             try
             {
-                this.RunInternal();
+                this.PrintConfig();
+
+                foreach( FileInfo file in this.filesToUpload )
+                {
+                    this.log.Information( $"Starting to process: {file.FullName}" );
+                    this.RunInternal( file );
+                }
             }
             finally
             {
@@ -116,11 +122,9 @@ namespace OpenWebUiUploader
             }
         }
 
-        private void RunInternal()
+        private void RunInternal( FileInfo file )
         {
-            this.PrintConfig();
-
-            IEnumerable<string> files = this.GetFiles();
+            IEnumerable<string> files = this.GetFiles( file );
             if( files.Any() == false )
             {
                 throw new FileNotFoundException( "Found no file(s) at specified location." );
@@ -162,28 +166,28 @@ namespace OpenWebUiUploader
 
             int currentFile = 0;
             int totalFiles = files.Count();
-            foreach( string file in files )
+            foreach( string filePath in files )
             {
                 ++currentFile;
 
-                this.log.Debug( $"Processing file ({currentFile}/{totalFiles}): {file}" );
-                string relativePath = Path.GetRelativePath( databaseDirectory.FullName, file );
+                this.log.Debug( $"Processing file ({currentFile}/{totalFiles}): {filePath}" );
+                string relativePath = Path.GetRelativePath( databaseDirectory.FullName, filePath );
                 this.log.Verbose( $"File path key: {relativePath}" );
 
                 try
                 {
                     FileHash? databaseFileHash = database.Files.FindById( relativePath );
 
-                    if( File.Exists( file ) )
+                    if( File.Exists( filePath ) )
                     {
-                        string diskFileHash = GetSha256( file );
+                        string diskFileHash = GetSha256( filePath );
 
                         if( databaseFileHash is null )
                         {
                             this.log.Verbose( "File exists on disk, but does not exist in database.  This will be uploaded." );
                             if( this.dryRun == false )
                             {
-                                this.Upload( database, file, relativePath, diskFileHash );
+                                this.Upload( database, filePath, relativePath, diskFileHash );
                             }
                         }
                         else if( diskFileHash.Equals( databaseFileHash.Hash, StringComparison.OrdinalIgnoreCase ) )
@@ -195,8 +199,8 @@ namespace OpenWebUiUploader
                             this.log.Verbose( "File on disk's hash does not match hash in database.  Must re-upload." );
                             if( this.dryRun == false )
                             {
-                                this.Remove( database, file, relativePath, databaseFileHash.ServerId );
-                                this.Upload( database, file, relativePath, diskFileHash );
+                                this.Remove( database, filePath, relativePath, databaseFileHash.ServerId );
+                                this.Upload( database, filePath, relativePath, diskFileHash );
                             }
                         }
                     }
@@ -213,7 +217,7 @@ namespace OpenWebUiUploader
                             {
                                 if( database.Files.Delete( relativePath ) == false )
                                 {
-                                    this.log.Error( $"Failed to remove file not on disk from database for: {file}" );
+                                    this.log.Error( $"Failed to remove file not on disk from database for: {filePath}" );
                                 }
                             }
                         }
@@ -221,7 +225,7 @@ namespace OpenWebUiUploader
                 }
                 catch( Exception e )
                 {
-                    this.log.Error( $"{file} failed: {e.GetType()} - {e.Message}" );
+                    this.log.Error( $"{filePath} failed: {e.GetType()} - {e.Message}" );
                     exceptions.Add( e );
                 }
             }
@@ -262,9 +266,9 @@ namespace OpenWebUiUploader
             return dbPath;
         }
 
-        private IEnumerable<string> GetFiles()
+        private IEnumerable<string> GetFiles( FileInfo file )
         {
-            DirectoryInfo? directory = this.fileToUpload.Directory;
+            DirectoryInfo? directory = file.Directory;
             if( directory is null )
             {
                 throw new InvalidOperationException( "Input file does not appear to live in a directory." );
@@ -276,13 +280,13 @@ namespace OpenWebUiUploader
 
             var files = new List<string>();
 
-            Glob glob = Glob.Parse( this.fileToUpload.FullName );
+            Glob glob = Glob.Parse( file.FullName );
 
-            foreach( FileInfo file in directory.EnumerateFiles( "*", SearchOption.AllDirectories ) )
+            foreach( FileInfo foundFile in directory.EnumerateFiles( "*", SearchOption.AllDirectories ) )
             {
-                if( glob.IsMatch( file.FullName ) )
+                if( glob.IsMatch( foundFile.FullName ) )
                 {
-                    files.Add( file.FullName );
+                    files.Add( foundFile.FullName );
                 }
             }
 
@@ -292,7 +296,7 @@ namespace OpenWebUiUploader
         private void PrintConfig()
         {
             this.log.Debug( $"Server URL: {this.serverUrl}" );
-            this.log.Debug( $"File(s) to upload: {this.fileToUpload.FullName}" );
+            this.log.Debug( $"File(s) to upload: [{string.Join( ',', this.filesToUpload.Select( f => f.FullName ) )}]" );
             this.log.Debug( $"Knowledge to upload to: {this.knowledge}" );
             this.log.Debug( $"Database path: {this.databasePath.FullName}" );
             this.log.Debug( $"Conversion File Path: {this.conversionDirectory.FullName}" );

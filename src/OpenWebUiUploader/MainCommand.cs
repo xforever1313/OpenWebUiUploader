@@ -32,7 +32,7 @@ namespace OpenWebUiUploader
         private readonly Command rootCommand;
 
         private readonly Option<Uri> serverUrlOption;
-        private readonly Option<FileInfo> filePathOption;
+        private readonly Option<FileInfo[]> filePathOption;
         private readonly Option<string> knowledgeOption;
         private readonly Option<FileInfo> databasePath;
         private readonly Option<DirectoryInfo> conversionDirectoryOption;
@@ -75,10 +75,12 @@ namespace OpenWebUiUploader
             };
             this.rootCommand.Add( this.serverUrlOption );
 
-            this.filePathOption = new Option<FileInfo>( "--file" )
+            this.filePathOption = new Option<FileInfo[]>( "--file" )
             {
+                AllowMultipleArgumentsPerToken = false,
                 Description = "The file(s) to upload to the knowledge in Open WebUI.  " +
-                              "Globs are allowed to upload multiple files.  " +
+                              "Globs i the file name (not a directory name) are allowed to upload multiple files.  " +
+                              "This option can be specified multiple times to allow for multiple directories.  " +
                               "Directories are not allowed.",
                 Required = true
             };

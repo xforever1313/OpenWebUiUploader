@@ -47,7 +47,7 @@ namespace OpenWebUiUploader
     /// </param>
     public record class UploaderConfig(
         Uri? ServerUrl,
-        FileInfo? FileToUpload,
+        FileInfo[]? FileToUpload,
         string? Knowledge,
         FileInfo? DatabasePath,
         DirectoryInfo? ConversionDirectory,
@@ -81,7 +81,11 @@ namespace OpenWebUiUploader
 
             if( this.FileToUpload is null )
             {
-                errors.Add( $"{nameof( this.DatabasePath )} is not specified, but must be." );
+                errors.Add( $"{nameof( this.FileToUpload )} is not specified, but must be." );
+            }
+            else if( this.FileToUpload.Length == 0 )
+            {
+                errors.Add( $"{nameof( this.FileToUpload )} is empty, but must contain at least one option." );
             }
 
             if( string.IsNullOrWhiteSpace( this.Knowledge ) )
@@ -106,6 +110,7 @@ namespace OpenWebUiUploader
             if(
                 ( this.ServerUrl is null ) ||
                 ( this.FileToUpload is null ) ||
+                ( this.FileToUpload.Length == 0 ) ||
                 string.IsNullOrWhiteSpace( this.Knowledge ) ||
                 ( this.DatabasePath is null ) ||
                 ( this.ConversionDirectory is null )
