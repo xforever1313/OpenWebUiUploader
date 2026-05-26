@@ -37,6 +37,7 @@ namespace OpenWebUiUploader
         private readonly FileInfo databasePath;
         private readonly DirectoryInfo conversionDirectory;
         private readonly bool deleteConvertedFiles;
+        private readonly MarkdownConverter converter;
         private readonly bool dryRun;
         private readonly string apiKey;
 
@@ -61,6 +62,9 @@ namespace OpenWebUiUploader
             this.deleteConvertedFiles = config.DeleteConvertedFiles;
             this.dryRun = config.DryRun;
             this.apiKey = config.GetApiKey();
+
+            this.converter = new MarkdownConverter();
+            this.converter.SetMaximumFileSize( 0 );
 
             this.log = log;
             this.httpClient = new HttpClient
@@ -366,7 +370,6 @@ namespace OpenWebUiUploader
             while( uniqueFile == false );
 
             this.log.Debug( $"Converting '{filePath}' to '{targetFile.FullName}'." );
-            var converter = new MarkdownConverter();
             string markdown = converter.ConvertToMarkdown( filePath );
             File.WriteAllText( targetFile.FullName, markdown );
 
